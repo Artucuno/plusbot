@@ -1,3 +1,7 @@
+PREFIX = "!"
+
 TOKEN = ''
 
-PREFIX = "!"
+OWNER = ""
+
+OID = ""
