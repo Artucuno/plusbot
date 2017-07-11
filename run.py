@@ -17,13 +17,33 @@ import datetime
 import glob
 import os
 import aiohttp
+import psutil
+import collections
 from app.chat_formatting import pagify, box
 
 logging.basicConfig(level=logging.INFO) # Configurates the logger
 logger = logging.getLogger('discord')
 description = '''TIP : you can use +cmds its better!'''
 bot = Bot(command_prefix=config.PREFIX) # Sets the client and sets the prefix
+def get_bot_uptime(*, brief=False):
+        # Stolen from owner.py - Courtesy of Danny
+        now = datetime.datetime.utcnow()
+        delta = now - bot.uptime
+        hours, remainder = divmod(int(delta.total_seconds()), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        days, hours = divmod(hours, 24)
 
+        if not brief:
+            if days:
+                fmt = '{d} days, {h} hours, {m} minutes, and {s} seconds'
+            else:
+                fmt = '{h} hours, {m} minutes, and {s} seconds'
+        else:
+            fmt = '{h} H - {m} M - {s} S'
+            if days:
+                fmt = '{d} D - ' + fmt
+
+        return fmt.format(d=days, h=hours, m=minutes, s=seconds)
 IS_WINDOWS = os.name == "nt"
 IS_MAC = sys.platform == "darwin"
 INTERACTIVE_MODE = not len(sys.argv) > 1  # CLI flags = non-interactive
@@ -32,6 +52,8 @@ def wait():
         input("Press enter to continue.")
 
 # Commands
+bot.remove_command("help")
+
 @bot.event
 async def on_server_join(server):
     channel = bot.get_channel("332703848953151489")
@@ -49,7 +71,6 @@ async def on_server_join(server):
 @bot.event
 async def on_member_join(member):
     channel = bot.get_channel("332703848953151489")
-    pm = "Hello {0} Welcome to {1} :smile: \n\nUse theese commands `+server` & `+invite` :smile:".format(member, member.server)
     msg = "{0} joinned {1} :smile:".format(member.mention, member.server)
     em = discord.Embed(color=0x42fc07)
     em.add_field(name='Join Log', value=("{0} joinned {1} :smile:".format(member.mention, member.server)))
@@ -138,17 +159,33 @@ async def request(url, user):
     chan = bot.get_channel("333171754698670080")
     msg = "{} used the command `+request`".format(user)
     await bot.send_message(chan, msg)
+
+@bot.command()
+async def call(currentserver, channelid, msg):
+    """Call a server/channel"""
+    channel = bot.get_channel(channelid)
+    mess = "Incomming call from {}".format(currentserver)
+    await bot.send_message(channel, mess)
+    await bot.send_message(channel, msg)
 @bot.command(pass_context=True)
-async def cmds(ctx):
-    """Cmds"""
+async def musicstats(ctx):
+    """Stats about my music"""
+    em = discord.Embed(color=0x42fc07)
+    em.add_field(name='Music Stats', value=("This is where you can see how the music is going"))
+    em.add_field(name='Status', value=("`Online`"))
+    em.add_field(name='Music Ping', value=("unknown"))
+    await bot.say(embed=em)
+@bot.command(pass_context=True)
+async def help(ctx):
+    """Shows this message"""
     author = ctx.message.author
     em = discord.Embed(color=0x0BFCF2)
-    em.add_field(name='Cmds', value=("\n\n"
+    em.add_field(name='Help', value=("\n\n"
                                      "**==============================**\n"
-                                     "+cmdsfun    fun comamnds\n"
-                                     "+cmdsmusic  Music Commands\n"
-                                     "+cmdsowner  Owner Commands\n"
-                                     "+cmdsdb     + DiscordBot Commands\n"
+                                     "+helpfun    fun comamnds\n"
+                                     "+helpmusic  Music Commands\n"
+                                     "+helpowner  Owner Commands\n"
+                                     "+helpdb     + DiscordBot Commands\n"
                                      "\n"
                                      "**==============================**\n"
                                      "+server     See my server\n"
@@ -162,28 +199,29 @@ async def cmds(ctx):
     em.set_footer(text="You can use +help but +cmds is better!")
     await bot.say(embed=em)
     channel = bot.get_channel("333171754698670080")
-    msg = "{} used the command `+cmds`".format(author.mention)
+    msg = "{} used the command `+help`".format(author.mention)
     await bot.send_message(channel, msg)
 @bot.command(pass_context=True)
-async def cmdsfun(ctx):
+async def helpfun(ctx):
     """Cmds"""
     author = ctx.message.author
     em = discord.Embed(color=0x0BFCF2)
-    em.add_field(name='Cmds', value=("\n\n"
+    em.add_field(name='Help', value=("\n\n"
                                      "**==============================**\n"
                                      "+info   Info about me\n"
                                      "+embed  embed something!\n"
-                                     "+say    make me say something!\n"))
+                                     "+say    make me say something!\n"
+                                     "+call   call a server!\n"))
     await bot.say(embed=em)
     channel = bot.get_channel("333171754698670080")
-    msg = "{} used the command `+cmdsfun`".format(author.mention)
+    msg = "{} used the command `+helpfun`".format(author.mention)
     await bot.send_message(channel, msg)
 @bot.command(pass_context=True)
-async def cmdsmusic(ctx):
+async def helpmusic(ctx):
     """Cmds"""
     author = ctx.message.author
     em = discord.Embed(color=0x0BFCF2)
-    em.add_field(name='Cmds', value=("\n\n"
+    em.add_field(name='Help', value=("\n\n"
                                      "**==============================**\n"
                                      "+play  Play a song\n"
                                      "+stop  Stop dat\n"
@@ -191,20 +229,20 @@ async def cmdsmusic(ctx):
                                      "+queue Whats next?"))
     await bot.say(embed=em)
     channel = bot.get_channel("333171754698670080")
-    msg = "{} used the command `+cmdsmusic`".format(author.mention)
+    msg = "{} used the command `+helpmusic`".format(author.mention)
     await bot.send_message(channel, msg)
 @bot.command(pass_context=True)
-async def cmdsdb(ctx):
+async def helpdb(ctx):
     """Cmds"""
     author = ctx.message.author
     em = discord.Embed(color=0x0BFCF2)
-    em.add_field(name='Cmds', value=("\n\n"
+    em.add_field(name='Help', value=("\n\n"
                                      "**==============================**\n"
                                      "request  Request a bot\n"
                                      "accept   Accept a bot (Owner)\n"))
     await bot.say(embed=em)
     channel = bot.get_channel("333171754698670080")
-    msg = "{} used the command `+cmdsdb`".format(author.mention)
+    msg = "{} used the command `+helpdb`".format(author.mention)
     await bot.send_message(channel, msg)
 @checks.is_owner()
 @bot.command(pass_context=True)
@@ -235,11 +273,11 @@ async def server(ctx):
     await bot.whisper(msg)
     await bot.say("Check your DM's :smile:")
 @bot.command(pass_context=True)
-async def cmdsowner(ctx):
+async def helpowner(ctx):
     """Cmds"""
     author = ctx.message.author
     em = discord.Embed(color=0x0BFCF2)
-    em.add_field(name='Cmds', value=("\n\n"
+    em.add_field(name='Help', value=("\n\n"
                                      "**==============================**\n"
                                      "+sga\n"
                                      "+sga2\n"
@@ -252,7 +290,7 @@ async def cmdsowner(ctx):
                                      "shutdown Shutting down...\n"))
     await bot.say(embed=em)
     channel = bot.get_channel("333171754698670080")
-    msg = "{} used the command `+cmdsowner`".format(author.mention)
+    msg = "{} used the command `+helpowner`".format(author.mention)
     await bot.send_message(channel, msg)
 @bot.command(pass_context=True)
 async def bump(ctx):
@@ -362,6 +400,14 @@ async def pbump(ctx):
                      "4) Use `+contact` to get help\n"
                      "and then")
 @bot.command(pass_context=True)
+async def ping(ctx):
+    author = ctx.message.author
+    await bot.say(author + "wants to know how fast i am!")
+    t1 = time.perf_counter()
+    await bot.send_typing(ctx.message.channel)
+    t2 = time.perf_counter()
+    await bot.say(str(round((t2-t1)*1000)) + "ms")
+@bot.command(pass_context=True)
 async def invite(ctx):
     author = ctx.message.author
     em = discord.Embed(color=author.colour)
@@ -444,7 +490,8 @@ async def setgame(game):
 @bot.command(pass_context=True)
 async def sga(ctx):
     """Owner Command!"""
-    await bot.change_presence(game=discord.Game(name='+cmds | {} Servers | {} Users'.format(len(bot.servers), len(set(bot.get_all_members())))))
+    channels = len([c for c in bot.get_all_channels()])
+    await bot.change_presence(game=discord.Game(name='+help | {} Servers | {} Channels | {} Users'.format(len(bot.servers), channels, len(set(bot.get_all_members())))))
 @checks.is_owner()
 @bot.command(pass_context=True)
 async def sga2(ctx):
@@ -453,33 +500,33 @@ async def sga2(ctx):
     t1 = time.perf_counter()
     await bot.send_typing(ctx.message.channel)
     t2 = time.perf_counter()
-    await bot.change_presence(game=discord.Game(name='+cmds | Ping {}'.format(str(round((t2-t1)*1000)) + "ms")))
+    await bot.change_presence(game=discord.Game(name='+help | Ping {}'.format(str(round((t2-t1)*1000)) + "ms")))
 @checks.is_owner()
 @bot.command(pass_context=True)
 async def sga3(ctx):
     """Owner Command!"""
     mem_usage = '{:.2f} MiB'.format(__import__('psutil').Process().memory_full_info().uss / 1024 ** 2)
-    await bot.change_presence(game=discord.Game(name='+cmds | {}'.format(mem_usage)))
+    await bot.change_presence(game=discord.Game(name='+help | {}'.format(mem_usage)))
 @checks.is_owner()
 @bot.command(pass_context=True)
 async def sga4(ctx):
     """Owner Command!"""
-    await bot.change_presence(game=discord.Game(name='+cmds | Running off a USB!'))
+    await bot.change_presence(game=discord.Game(name='+help | Running off a USB!'))
 @checks.is_owner()
 @bot.command(pass_context=True)
 async def sga5(ctx):
     """Owner Command!"""
-    await bot.change_presence(game=discord.Game(name='+cmds | v{}'.format(discord.__version__)))
+    await bot.change_presence(game=discord.Game(name='+help | v{}'.format(discord.__version__)))
 @checks.is_owner()
 @bot.command(pass_context=True)
 async def sga6(ctx):
     """Owner Command!"""
-    await bot.change_presence(game=discord.Game(name='+cmds | {} Guilds | {} Users'.format(len(bot.servers), len(set(bot.get_all_members())))))
+    await bot.change_presence(game=discord.Game(name='+help | {} Guilds | {} Users'.format(len(bot.servers), len(set(bot.get_all_members())))))
 @checks.is_owner()
 @bot.command(pass_context=True)
 async def sga7(ctx):
     """Owner Command!"""
-    await bot.change_presence(game=discord.Game(name='+cmds | {} Users'.format(len(set(bot.get_all_members())))))
+    await bot.change_presence(game=discord.Game(name='+help | {} Users'.format(len(set(bot.get_all_members())))))
 @bot.command()
 async def order(user, food):
     """Order food"""
