@@ -1,8 +1,7 @@
 # plusbot
+# NO LONGER MAINTAINED
 an Awesome Discord Bot
 
-# Info
-You are able to use this bot but you must give us credit
 
 # Installing
 ```
